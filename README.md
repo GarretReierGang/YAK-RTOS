@@ -1,7 +1,7 @@
 # YAK-RTOS
 
 ## A real-time kernel developed in C for the 8086 architecture.
-Implemented using the tools in [BYU's CAEDM lab](https://github.com/plusk01/8086-toolchain).
+Implemented using the tools from [BYU's CAEDM lab](https://github.com/plusk01/8086-toolchain).
 ### Kernal specification:
 
 http://ece425web.groups.et.byu.net/stable/labs/kernel.html
