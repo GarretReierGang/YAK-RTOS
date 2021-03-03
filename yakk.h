@@ -2,7 +2,8 @@
 #define YAKK_H
 
 #define DEBUG_MODE
-#define VERBOSE
+//#define DEBUG_YKQ
+//#define VERBOSE
 #define SEMAPHORE
 #define MESSAGING
 

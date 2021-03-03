@@ -2,7 +2,6 @@
 #include "yakk.h"
 
 extern int KeyBuffer;
-//extern YKSEM* NSemPtr;
 
 void reset_handler() {
 	exit(0);
@@ -32,8 +31,4 @@ void keyboard_handler() {
 		printNewLine();
 		return;
 	}
-    if (KeyBuffer == 'p')
-    {
-//        YKSemPost(NSemPtr);
-    }
 }

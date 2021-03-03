@@ -16,8 +16,11 @@ lab6_app.s: lab6_app.c
 
 lab5.bin: lab5.s
 	nasm lab5.s -o lab5.bin -l lab5.lst
-lab5.s: clib.s my_isr.s my_isrh.s yakc.s yaks.s lab5_app.s
+lab5.s: clib.s my_isr.s lab5inth.s yakc.s yaks.s lab5_app.s
 	cat $^ > $@
+lab5inth.s: lab5inth.c
+	cpp $^ lab5inth.i
+	c86 lab5inth.i $@
 lab5_app.s: lab5_app.c
 	cpp $^ lab5_app.i
 	c86 lab5_app.i $@

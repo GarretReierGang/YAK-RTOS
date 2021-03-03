@@ -116,13 +116,13 @@ void YKScheduler(void) {
     YKEnterMutex();
     if (YKRdyList == RunningTask)
     {
+        YKExitMutex();
         return;
     }
     TaskToSave = RunningTask;
     RunningTask = YKRdyList;
 
     YKCtxSwCount++;
-    //YKExitMutex();
     YKDispatcher(SAVE_CONTEXT);   // setup runtime environment for new task
 }
 
@@ -247,6 +247,7 @@ void YKTickHandler() {
         temp->delay--;
         if (temp->delay == 0)
         {
+            #ifdef VERBOSE
             printString("Task Ready! ");
             printInt(temp->taskNumber);
             printChar(' ');
@@ -254,6 +255,7 @@ void YKTickHandler() {
             printChar(' ');
             printInt(temp->next);
             printNewLine();
+            #endif
             next = temp->next;
             next->prev = temp->prev;
             temp->prev->next = next;
@@ -392,8 +394,10 @@ void* YKQPend(YKQ* messageQueue) {
     if (messageQueue->numOfMsgs <= 0)
     {
         // Wait for message;
+        #if (defined VERBOSE) && (defined DEBUG_YKQ)
         printInt(RunningTask->taskNumber);
         printString(" Waiting On Message\n");
+        #endif
         temp = queue_pop(&YKRdyList);
         queue_insertNode(&messageQueue->blockedOn, temp);
         YKScheduler();
@@ -412,8 +416,10 @@ void* YKQPend(YKQ* messageQueue) {
 int YKQPost(YKQ *messageQueue, void *msg) {
     TCBptr temp;
     YKEnterMutex();
+    #if (defined VERBOSE) && (defined DEBUG_YKQ)
     printInt(RunningTask->taskNumber);
     printString(" Posted Message\n");
+    #endif
     if (messageQueue->numOfMsgs >= messageQueue->size)
     {
         YKExitMutex();
