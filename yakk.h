@@ -2,7 +2,9 @@
 #define YAKK_H
 
 #define DEBUG_MODE
+#define VERBOSE
 #define SEMAPHORE
+#define MESSAGING
 
 extern unsigned int YKCtxSwCount;
 extern unsigned int YKIdleCount;
@@ -31,7 +33,7 @@ typedef struct sem {
 } YKSEM;
 #endif
 
-
+#ifdef MESSAGING
 typedef struct ykq
 {
   void ** messages;
@@ -41,11 +43,14 @@ typedef struct ykq
   TCBptr blockedOn;
   int numOfMsgs;
 } YKQ;
+#endif
 
+#ifdef EVENTS
 typedef struct eventGroup {
   unsigned flags;
   TCBptr waitingOn;
 } YKEvent;
+#endif
 
 
 
@@ -86,7 +91,7 @@ void YKSemPost(YKSEM *semaphore); // Release flag
 // Slower and more complicated than semaphore,
 // Allows more complicated messages to be exchanged.
 //-------------------------------------------------------
-#ifdef YKQ
+#ifdef MESSAGING
 // Preallocated storage; number of messages;
 YKQ* YKQCreate(void **start, unsigned size);
 // Remove oldest message from queue, or wait for message;

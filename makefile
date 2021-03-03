@@ -1,6 +1,18 @@
 
-a.bin: lab5.s #a.bin for easier testing of program
+a.bin: lab6.s #a.bin for easier testing of program
 	nasm $^ -o a.bin -l a.lst
+
+lab6.bin: lab6.s
+	nasm lab6.s -o lab6.bin -l lab6.lst
+lab6.s: clib.s lab6isr.s lab6inth.s yakc.s yaks.s lab6_app.s
+	cat $^ > $@
+lab6inth.s: lab6inth.c
+	cpp $^ lab6inth.i
+	c86 lab6inth.i $@
+lab6_app.s: lab6_app.c
+	cpp $^ lab6_app.i
+	c86 lab6_app.i $@
+
 
 lab5.bin: lab5.s
 	nasm lab5.s -o lab5.bin -l lab5.lst

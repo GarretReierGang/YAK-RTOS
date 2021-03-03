@@ -6,15 +6,10 @@
 #define SAVE_CONTEXT 1
 #define NUM_REGISTERS 18
 
-void* savePointer; // Used by x86 dispatcher to save the current stackptr. See yaks.s YKSaveContext for details.
-void* restorePointer; // Used by x86 dispatcher to restore current stackptr. See yaks.s YKRestoreContext for details.
-
-
 
 int Running;
 
-
-TCBptr TaskToSave;
+TCBptr TaskToSave; // Used by x86 dispatcher to save the current stackptr. See yaks.s YKSaveContext for details.
 TCBptr RunningTask;
 TCBptr YKRdyList;		/* a list of TCBs of all ready tasks
 
@@ -34,9 +29,9 @@ unsigned int NestingLevel;
 
 
 #ifdef SEMAPHORE
-unsigned int YKAvailSemaphores = MAX_SEMAPHORES;
+unsigned int YKSemAvailCount = MAX_SEMAPHORES;
 #endif
-#ifdef YKQ
+#ifdef MESSAGING
 unsigned int YKQAvailCount = MAX_MESSAGE_QUEUES;
 #endif
 #ifdef YKEvent
@@ -216,13 +211,17 @@ void YKRun(void) {
     Running = 1;
     YKCtxSwCount++;
     RunningTask = YKRdyList;
-    restorePointer = RunningTask->stackptr;
     YKDispatcher(DONT_SAVE_CONTEXT);
 }
 
 void YKDelayTask(unsigned count) {
     TCBptr temp;
     YKEnterMutex();
+    #if (defined DEBUG_MODE) && (defined VERBOSE)
+    printString("Delaying Task: ");
+    printInt(YKRdyList->taskNumber);
+    printNewLine();
+    #endif
     temp = queue_pop(&YKRdyList); // Remove it from the ready list
     temp->delay = count;
 
@@ -248,6 +247,13 @@ void YKTickHandler() {
         temp->delay--;
         if (temp->delay == 0)
         {
+            printString("Task Ready! ");
+            printInt(temp->taskNumber);
+            printChar(' ');
+            printInt(temp->prev);
+            printChar(' ');
+            printInt(temp->next);
+            printNewLine();
             next = temp->next;
             next->prev = temp->prev;
             temp->prev->next = next;
@@ -291,14 +297,14 @@ YKSEM YKSemaphores[MAX_SEMAPHORES];
 YKSEM* YKSemCreate (int initialValue) {
     YKSEM* semaphore;
     YKEnterMutex();
-    if (YKAvailSemaphores <= 0)
+    if (YKSemAvailCount <= 0)
     {
         YKExitMutex();
         printString("Not enough semaphores");
         exit(0xff);
     } //ELSE
-    YKAvailSemaphores--;
-    semaphore = &YKSemaphores[YKAvailSemaphores];
+    YKSemAvailCount--;
+    semaphore = &YKSemaphores[YKSemAvailCount];
     semaphore->value = initialValue;
     semaphore->blockedOn = NULL;
     YKExitMutex();
@@ -354,7 +360,7 @@ void YKSemPost(YKSEM *semaphore) {
 // Implemented here using a ring buffer to store messages;
 
 //-------------------------------------------------------
-#ifdef YKQ
+#ifdef MESSAGING
 YKQ YKQueues[MAX_MESSAGE_QUEUES];
 
 YKQ* YKQCreate(void **start, unsigned size) {
@@ -379,13 +385,15 @@ YKQ* YKQCreate(void **start, unsigned size) {
 }
 
 // Remove oldest message from queue, or wait for message;
-void* YKQPend(YKQ *messageQueue) {
+void* YKQPend(YKQ* messageQueue) {
     void* msg;
     TCBptr temp;
     YKEnterMutex();
-    if (queue->numOfMsgs <= 0)
+    if (messageQueue->numOfMsgs <= 0)
     {
         // Wait for message;
+        printInt(RunningTask->taskNumber);
+        printString(" Waiting On Message\n");
         temp = queue_pop(&YKRdyList);
         queue_insertNode(&messageQueue->blockedOn, temp);
         YKScheduler();
@@ -393,8 +401,8 @@ void* YKQPend(YKQ *messageQueue) {
     // Will reach here if this is the highest Priority & there is a message to read, YKDispatch will restore mutex when this is called again.
     msg = messageQueue->messages[messageQueue->tail++];
 
-    if (messsageQueue->tail >= messageQueue)
-        messageQueue->tail = 0
+    if (messageQueue->tail >= messageQueue->size)
+        messageQueue->tail = 0;
     messageQueue->numOfMsgs--;
 
     YKExitMutex();
@@ -404,11 +412,14 @@ void* YKQPend(YKQ *messageQueue) {
 int YKQPost(YKQ *messageQueue, void *msg) {
     TCBptr temp;
     YKEnterMutex();
+    printInt(RunningTask->taskNumber);
+    printString(" Posted Message\n");
     if (messageQueue->numOfMsgs >= messageQueue->size)
     {
         YKExitMutex();
         return POST_MSG_FAIL;
     }
+    messageQueue->numOfMsgs++;
     messageQueue->messages[messageQueue->head++] = msg;
 
     if (messageQueue->head >= messageQueue->size)
