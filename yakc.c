@@ -2,17 +2,22 @@
 #include "yakk.h"
 #include "clib.h"
 
-
 #define DONT_SAVE_CONTEXT 0
 #define SAVE_CONTEXT 1
 #define NUM_REGISTERS 18
 
 void* savePointer; // Used by x86 dispatcher to save the current stackptr. See yaks.s YKSaveContext for details.
 void* restorePointer; // Used by x86 dispatcher to restore current stackptr. See yaks.s YKRestoreContext for details.
-int GLOB_FLAG_running;
 
+
+
+int Running;
+
+
+TCBptr TaskToSave;
 TCBptr RunningTask;
 TCBptr YKRdyList;		/* a list of TCBs of all ready tasks
+
 				   in order of decreasing priority */
 TCBptr YKSuspList;		/* tasks delayed or suspended */
 TCBptr YKAvailTCBList;		/* a list of available TCBs */
@@ -28,8 +33,8 @@ unsigned int YKTickNum;
 unsigned int NestingLevel;
 
 
-#ifdef YKSem
-unsigned int YKSemAvailCount = MAX_SEMAPHORES;
+#ifdef SEMAPHORE
+unsigned int YKAvailSemaphores = MAX_SEMAPHORES;
 #endif
 #ifdef YKQ
 unsigned int YKQAvailCount = MAX_MESSAGE_QUEUES;
@@ -45,31 +50,30 @@ unsigned int YKEventAvailCount = MAX_EVENTS;
 // Priority Queue Implementation
 // using a linked list
 //? Say we have nodes A B D and insert node C
-void queue_insertNode(TCBptr& queue, TCBptr node) {
+void queue_insertNode(TCBptr* queue, TCBptr node) {
     TCBptr head;
-    if ( queue == NULL)
+    if ( (*queue) == NULL)
     {
-      queue = node;
+      (*queue) = node;
       // node->prev = NULL;
       node->next = NULL;
       return;
     }
     //special case, the new node has a higher Priority
     // exit early replace the queue's head with the new node
-    if (node->priority < queue->priority)
+    if (node->priority < (*queue)->priority)
     {
         // node->prev = NULL;    //soon to be new head's Prev = NULL
-        queue->prev = node; //Old Head's Prev = new Head
+        //(*queue)->prev = node; //Old Head's Prev = new Head
 
         node->next = (*queue); //new Head's->next = Old Head
-        queue = node;       //Head = new Head
+        (*queue) = node;       //Head = new Head
         return;                //node inserted, finish early
     }
 
     // Highest priority task has been checked.
     // moving on to the next task in the line
-    head = queue->next;
-
+    head = (*queue);
     while (head->next != NULL && !(node->priority < head->next->priority ))
     {
         head = head->next;
@@ -81,9 +85,9 @@ void queue_insertNode(TCBptr& queue, TCBptr node) {
     head->next = node;          // B->next = C
 }
 
-inline TCBptr queue_pop(TCBptr& queue) {
-    TCBptr tmp = queue;     // A
-    queue = queue->next; // Head = B
+TCBptr queue_pop(TCBptr* queue) {
+    TCBptr tmp = (*queue);     // A
+    (*queue) = (*queue)->next; // Head = B
     // queue->prev = NULL;     // B->prev = NULL;
     return tmp;                // return A
 }
@@ -95,7 +99,11 @@ inline TCBptr queue_pop(TCBptr& queue) {
 void printQueue(TCBptr queue) {
     while (queue != NULL)
     {
+        printString("Task: ");
+        printInt(queue->taskNumber);
+        printChar(' ');
         printInt(queue->priority);
+        printNewLine();
         queue = queue->next;
     }
 }
@@ -110,14 +118,16 @@ void printQueue(TCBptr queue) {
 void YKScheduler(void) {
     // If the currently running task has the highest priority;
     // Do not need to save contex or anything like that.
+    YKEnterMutex();
     if (YKRdyList == RunningTask)
     {
-    return;
+        return;
     }
-    savePointer = RunningTask->stackptr;
+    TaskToSave = RunningTask;
     RunningTask = YKRdyList;
-    restorePointer = YKRdyList->stackptr;
+
     YKCtxSwCount++;
+    //YKExitMutex();
     YKDispatcher(SAVE_CONTEXT);   // setup runtime environment for new task
 }
 
@@ -125,7 +135,9 @@ void YKScheduler(void) {
 // Used to calculate the amount of time the kernal is idle.
 void YKIdleTask(void) {
     while(1){
+        YKEnterMutex();
         YKIdleCount++;
+        YKExitMutex();
     }
 }
 
@@ -134,6 +146,7 @@ void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority) {
     TCBptr temp;
     int i;
     int* tmpStackPointer;
+    static int TaskNumber = 0;
 
     // Disable interupts;
     YKEnterMutex();
@@ -160,10 +173,18 @@ void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority) {
     temp->priority = priority;
     temp->state = 0;
     temp->delay = 0;
+    #ifdef DEBUG_MODE
+    printString("Creating Task: ");
+    printInt(TaskNumber);
+    printNewLine();
+    temp->taskNumber = TaskNumber++;
+    #endif
     // Put task address at stack
-
-    queue_insertNode(YKRdyList, temp);
-    if(GLOB_FLAG_running) {
+    queue_insertNode(&YKRdyList, temp);
+    #if (defined DEBUG_MODE) && (defined VERBOSE)
+    printQueue(YKRdyList);
+    #endif
+    if(Running) {
         YKScheduler();
     }
 
@@ -174,12 +195,13 @@ void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority) {
 void YKInitialize(void) {
     int i;
     // construct available TCB list
-    GLOB_FLAG_running = 0;
+    Running = 0;
     // init variables
     YKIdleCount = 0;
     YKCtxSwCount = 0;
     YKTickNum = 0;
     NestingLevel = 0;
+    YKSuspList = NULL;
 
     YKAvailTCBList = &(YKTCBArray[0]);
     for (i = 0; i < MAX_TASKS; i++)
@@ -191,7 +213,7 @@ void YKInitialize(void) {
 }
 
 void YKRun(void) {
-    GLOB_FLAG_running = 1;
+    Running = 1;
     YKCtxSwCount++;
     RunningTask = YKRdyList;
     restorePointer = RunningTask->stackptr;
@@ -201,7 +223,7 @@ void YKRun(void) {
 void YKDelayTask(unsigned count) {
     TCBptr temp;
     YKEnterMutex();
-    temp = queue_pop(YKRdyList); // Remove it from the ready list
+    temp = queue_pop(&YKRdyList); // Remove it from the ready list
     temp->delay = count;
 
     // Delay task uses a doubly linked stack
@@ -210,7 +232,6 @@ void YKDelayTask(unsigned count) {
         YKSuspList->prev = temp;
     temp->next = YKSuspList;
     YKSuspList = temp;
-
     YKScheduler();
     YKExitMutex();
 }
@@ -230,7 +251,7 @@ void YKTickHandler() {
             next = temp->next;
             next->prev = temp->prev;
             temp->prev->next = next;
-            queue_insertNode(YKRdyList, temp);
+            queue_insertNode(&YKRdyList, temp);
             if (temp == YKSuspList)
                 YKSuspList = next;
             temp = next;
@@ -250,7 +271,7 @@ void YKEnterISR() {
 void YKExitISR() {
     NestingLevel--;
     // Should only call YKScheduler once all interupts have been handled.
-    if (NestingLevel == 0 && running) {
+    if (NestingLevel == 0 && Running) {
         YKScheduler();
     }
 }
@@ -264,11 +285,11 @@ void YKExitISR() {
 //    the same order to prevent deadlock.
 //    (Claim A, than B. Never claim B than A)
 //-------------------------------------------------------
-#ifdef YKSem
-YKSem YKSemaphores[MAX_SEMAPHORES];
+#ifdef SEMAPHORE
+YKSEM YKSemaphores[MAX_SEMAPHORES];
 
-YKSem* YKSemCreate (int initialValue) {
-    YKSem* semaphore;
+YKSEM* YKSemCreate (int initialValue) {
+    YKSEM* semaphore;
     YKEnterMutex();
     if (YKAvailSemaphores <= 0)
     {
@@ -283,7 +304,7 @@ YKSem* YKSemCreate (int initialValue) {
     YKExitMutex();
     return semaphore;
 }
-void YKSemPend(YKSem *semaphore) {
+void YKSemPend(YKSEM *semaphore) {
     TCBptr temp;
     YKEnterMutex();
     if (semaphore->value-- > 0){
@@ -292,14 +313,14 @@ void YKSemPend(YKSem *semaphore) {
         return;
     }
     // Semaphore busy:
-    temp = queue_pop(YKRdyList);
-    queue_insertNode(semaphore->blockedOn);
+    temp = queue_pop(&YKRdyList);
+    queue_insertNode(&semaphore->blockedOn, temp);
     YKScheduler();
     YKExitMutex();
 }
 
 // Can be called by an interupt, potentially.
-void YKSemPost(YKSem *semaphore) {
+void YKSemPost(YKSEM *semaphore) {
     TCBptr temp;
     YKEnterMutex();
     if (semaphore->value++ >= 0)
@@ -311,10 +332,10 @@ void YKSemPost(YKSem *semaphore) {
     // Remove top of blocked tasks.
     if (semaphore->blockedOn != NULL)
     {
-        temp = queue_pop(semaphore->blockedOn);
+        temp = queue_pop(&semaphore->blockedOn);
         semaphore->blockedOn = temp->next;
         // Insert removed task to ready list;
-        queue_insertNode(YKRdyList, temp);
+        queue_insertNode(&YKRdyList, temp);
         if (NestingLevel == 0)
         {
             YKScheduler();
@@ -365,8 +386,8 @@ void* YKQPend(YKQ *messageQueue) {
     if (queue->numOfMsgs <= 0)
     {
         // Wait for message;
-        temp = queue_pop(YKRdyList);
-        queue_insertNode(messageQueue->blockedOn, temp);
+        temp = queue_pop(&YKRdyList);
+        queue_insertNode(&messageQueue->blockedOn, temp);
         YKScheduler();
     }
     // Will reach here if this is the highest Priority & there is a message to read, YKDispatch will restore mutex when this is called again.
@@ -395,8 +416,8 @@ int YKQPost(YKQ *messageQueue, void *msg) {
 
     if (messageQueue->blockedOn != NULL)
     {
-        temp = queue_pop(messageQueue->blockedOn);
-        queue_insertNode(YKRdyList, temp);
+        temp = queue_pop(&messageQueue->blockedOn);
+        queue_insertNode(&YKRdyList, temp);
         if (NestingLevel == 0)
             YKScheduler();
     }
@@ -412,10 +433,6 @@ int YKQPost(YKQ *messageQueue, void *msg) {
 //                      Events
 // -------------------------------------------------------
 #ifdef YKEvent
-typedef struct eventGroup {
-  unsigned flags;
-  TCBptr blockedOn;
-} YKEvent;
 
 YKEvent YKEvents[MAX_EVENTS];
 
@@ -451,7 +468,7 @@ unsigned YKEventPend(YKEvenet *event, unsigned eventMask, int waitMode) {
     YKEnterMutex();
     if (!eventCheck(event->flags, eventMask, waitMode))
     {
-        temp = queue_pop(YKRdyList);
+        temp = queue_pop(&YKRdyList);
         temp->prev = NULL;
         if (event->blockedOn != NULL)
             event->blockedOn->prev = temp;
@@ -484,7 +501,7 @@ void YKEventSet(YKEvent *event, unsigned eventMask) {
             next = temp->next;
             next->prev = temp->prev;
             temp->prev->next = next;
-            queue_insertNode(YKRdyList, temp);
+            queue_insertNode(&YKRdyList, temp);
             if (temp == event->blockedOn)
                 event->blockedOn = next;
             temp = next;

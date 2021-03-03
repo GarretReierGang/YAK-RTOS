@@ -374,7 +374,7 @@ SR_ulshl:
 	mov    ax, [bp+6]	; pop loword(a)
 	mov    dx, [bp+8]	; pop hiword(a)
 	mov    cx, [bp+10]	; pop word(b)
-	
+
 	; LXLSH@
 	cmp    cl,10h
 	jnb    LSR_12
@@ -410,7 +410,7 @@ SR_lshr:	; N_LXRSH@
         mov    ax, [bp+6]	; pop loword(a)
 	mov    dx, [bp+8]	; pop hiword(a)
 	mov    cx, [bp+10]	; pop word(b)
-	
+
 	; LXRSH@
 	cmp    cl,10h
 	jnb    LSR_13
@@ -446,7 +446,7 @@ SR_ulshr:	; N_LXURSH@
         mov    ax, [bp+6]	; pop loword(a)
 	mov    dx, [bp+8]	; pop hiword(a)
 	mov    cx, [bp+10]	; pop word(b)
-	
+
 	; LXURSH@
 	cmp    cl,10h
 	jnb    LSR_14
@@ -482,7 +482,7 @@ SR_ulmul:
 	mov    cx, [bp+8]	; pop hiword(a)
 	mov    ax, [bp+10]	; pop loword(b)
 	mov    dx, [bp+12]	; pop hiword(b)
-	
+
 	xchg   si,ax
 	xchg   dx,ax
 	test   ax,ax
@@ -1108,4 +1108,3 @@ L_clib_83:
 	mov	bp, sp
 	sub	sp, 16
 	jmp	L_clib_84
-

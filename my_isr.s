@@ -12,9 +12,16 @@ tick:
 	push DI
 	push DS
 	push ES
+
+    call YKEnterISR
+
 	sti
 	call tick_handler
 	cli
+
+    call YKExitISR
+
+
 	mov al, 0x20
 	out 0x20, al
 	pop ES
@@ -37,9 +44,15 @@ keyboard:
 	push DI
 	push DS
 	push ES
+
+    call YKEnterISR
+
 	sti
 	call keyboard_handler
 	cli
+
+    call YKExitISR
+    
 	mov al, 0x20
 	out 0x20, al
 	pop ES

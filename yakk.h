@@ -1,9 +1,12 @@
 #ifndef YAKK_H
 #define YAKK_H
 
-extern int YKCtxSwCount;
-extern int YKIdleCount;
-extern int YKTickNum;
+#define DEBUG_MODE
+#define SEMAPHORE
+
+extern unsigned int YKCtxSwCount;
+extern unsigned int YKIdleCount;
+extern unsigned int YKTickNum;
 
 typedef struct taskblock *TCBptr;
 typedef struct taskblock
@@ -15,8 +18,34 @@ typedef struct taskblock
     int delay;			/* #ticks yet to wait */
     TCBptr next;		/* ptr to next Task in queue */
     TCBptr prev;		/* ptr to previous task in the stack */
-}  TCB;
+    #ifdef DEBUG_MODE
+    int taskNumber;
+    #endif
+} TCB;
 
+
+#ifdef SEMAPHORE
+typedef struct sem {
+  int value;
+  TCBptr blockedOn;
+} YKSEM;
+#endif
+
+
+typedef struct ykq
+{
+  void ** messages;
+  unsigned size;
+  unsigned head;
+  unsigned tail;
+  TCBptr blockedOn;
+  int numOfMsgs;
+} YKQ;
+
+typedef struct eventGroup {
+  unsigned flags;
+  TCBptr waitingOn;
+} YKEvent;
 
 
 
@@ -44,13 +73,11 @@ void YKSaveContext(void);
 //    the same order to prevent deadlock.
 //    (Claim A, than B. Never claim B than A)
 //-------------------------------------------------------
-typedef struct sem YKSem {
-  int value;
-  TCBptr blockedOn;
-};
-YKSem* YKSemCreate (int initialValue);
-void YKSemPend(YKSem *semaphore); // Claim flag
-void YKSemPost(YKSem *semaphore); // Release flag
+#ifdef SEMAPHORE
+YKSEM* YKSemCreate (int initialValue);
+void YKSemPend(YKSEM *semaphore); // Claim flag
+void YKSemPost(YKSEM *semaphore); // Release flag
+#endif
 //-------------------------------------------------------
 //=======================================================
 
@@ -59,21 +86,14 @@ void YKSemPost(YKSem *semaphore); // Release flag
 // Slower and more complicated than semaphore,
 // Allows more complicated messages to be exchanged.
 //-------------------------------------------------------
-typedef struct ykq
-{
-  void ** messages;
-  unsigned size;
-  unsigned head;
-  unsigned tail;
-  TCBptr blockedOn;
-  int numOfMsgs;
-} YKQ;
+#ifdef YKQ
 // Preallocated storage; number of messages;
 YKQ* YKQCreate(void **start, unsigned size);
 // Remove oldest message from queue, or wait for message;
 void* YKQPend(YKQ *queue);
 //
 int YKQPost(YKQ *queue, void *msg);
+#endif
 //--------------------------------------------------------
 //========================================================
 
@@ -81,15 +101,12 @@ int YKQPost(YKQ *queue, void *msg);
 //  Events, slower and more complicated to process than a semaphore
 //
 //-----------------------------------------------------------------------
-typedef struct eventGroup {
-  unsigned flags;
-  TCBptr waitingOn;
-} YKEvent;
-
+#ifdef YKEvent
 YKEvent* YKEventCreate(unsigned init);
 unsigned YKEventPend(YKEvenet *event, unsigned eventMask, int waitMode);
 void YKEventSet(YKEvent *event, unsigned eventMask);
 void YKEventReset(YKEvent *event, unsigned eventMask);
+#endif
 //------------------------------------------------------------------------
 //========================================================================
 

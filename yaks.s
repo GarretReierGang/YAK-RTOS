@@ -6,46 +6,78 @@ YKExitMutex:
     sti
     ret
 
-YKDispatcher: ; Saves current Context if needed and than starts new task.
-	push BP
-	mov BP, SP
-	push AX   ; save AX register
-	mov AX, [BP+4]
-	cmp AX, 1 ; Check to see if we should save context
-  pop AX    ; Restore ax Register
-	je YKSaveContext
-YKRestoreContext:
-  mov	sp, [restorePointer] ; //Restoring stack pointer.
-  pop	ax  ; -0
-  pop	bx  ; -2
-  pop	cx  ; -4
-  pop	dx  ; -6
-  pop	es  ; -8
-  pop	ds  ; -10
-  pop	di  ; -12
-  pop	si  ; -14
-  pop	bp  ; -16;
-  iret    ; iret restores IP, CS, and Flags. popped in that order.
-
 YKSaveContext:
-  pushf            ; Saving flags
-  push	cs         ; -20
-  push	word[bp+2] ;-18
-  push	word[bp]   ;-16
-  push	si ;14
-  push	di ;-12
-  push	ds ;-10
-  push	es ;-8
-  push	dx ;-6
-  push	cx ;-4
-  push	bx ;-2
-  push	ax ;-0
-  mov	[savePointer], sp ; Stack Pointer.
-  jmp	YKRestoreContext
+    pushf           ; Saving Flags
+    push cs         ; Code Segment
+    push word[bp+2] ; Instruction Pointer
 
-YKRunTaskFirst:
-	mov	si, word [runningTask]
-	mov sp, word [si]
-	mov	si, word [si]
-	mov ax, word [si]
-	call ax
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push bp
+    push es
+    push ds
+
+    mov bx, [TaskToSave]
+    mov [bx], sp
+
+    jmp YKRestoreContext
+
+YKDispatcher:
+    push bp
+    mov bp, sp
+    push ax
+    mov ax, word[bp+4]
+    cmp al, 1
+    pop ax
+    je YKSaveContext
+YKRestoreContext:
+    mov bx, [RunningTask]
+    mov sp, [bx]
+
+    pop ds
+    pop es
+    pop bp
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    iret    ; Restores Flags, Code Segment, and the Instruction Pointer.
+
+YKTick:
+    ;Save Context
+    push AX
+    push BX
+    push CX
+    push DX
+    push BP
+    push SI
+    push DI
+    push DS
+    push ES
+
+    call YKEnterISR
+
+    sti
+    call YKTickHandler
+    cli
+
+    call YKExitISR
+
+    mov al, 0x20
+    out 0x20, al
+    pop ES
+    pop DS
+    pop DI
+    pop SI
+    pop BP
+    pop DX
+    pop CX
+    pop BX
+    pop AX
+    iret

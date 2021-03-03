@@ -1,6 +1,8 @@
 #include "clib.h"
+#include "yakk.h"
 
 extern int KeyBuffer;
+//extern YKSEM* NSemPtr;
 
 void reset_handler() {
 	exit(0);
@@ -13,6 +15,7 @@ void tick_handler() {
 	printString("TICK ");
 	printInt(tick_num);
 	printNewLine();
+    YKTickHandler();
 }
 
 void keyboard_handler() {
@@ -29,9 +32,8 @@ void keyboard_handler() {
 		printNewLine();
 		return;
 	}
-	printNewLine();
-	printString("KEYPRESS (");
-	printChar(KeyBuffer);
-	printString(") IGNORED");
-	printNewLine();
+    if (KeyBuffer == 'p')
+    {
+//        YKSemPost(NSemPtr);
+    }
 }
