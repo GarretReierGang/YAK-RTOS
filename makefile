@@ -1,6 +1,17 @@
 
-a.bin: lab6.s #a.bin for easier testing of program
+a.bin: lab7.s #a.bin for easier testing of program
 	nasm $^ -o a.bin -l a.lst
+
+lab7.bin: lab7.s
+	nasm lab7.s -o lab7.bin -l lab7.lst
+lab7.s: clib.s lab6isr.s lab7inth.s yakc.s yaks.s lab7_app.s
+	cat $^ > $@
+lab7inth.s: lab7inth.c
+	cpp $^ lab7inth.i
+	c86 lab7inth.i $@
+lab7_app.s: lab7_app.c
+	cpp $^ lab7_app.i
+	c86 lab7_app.i $@
 
 lab6.bin: lab6.s
 	nasm lab6.s -o lab6.bin -l lab6.lst
@@ -12,7 +23,6 @@ lab6inth.s: lab6inth.c
 lab6_app.s: lab6_app.c
 	cpp $^ lab6_app.i
 	c86 lab6_app.i $@
-
 
 lab5.bin: lab5.s
 	nasm lab5.s -o lab5.bin -l lab5.lst
@@ -61,7 +71,7 @@ yakc.s: yakc.c
 	cpp $^ yakc.i
 	c86 yakc.i $@
 
-all: lab4b.bin lab4c.bin lab4d.bin lab5.bin a.bin
+all: lab4b.bin lab4c.bin lab4d.bin lab5.bin lab6.bin a.bin
 
 
 .PHONY: clean

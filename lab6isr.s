@@ -15,7 +15,7 @@ tick:
 
     call YKEnterISR
 	sti
-	call lab6tick
+	call tickHandler
 	cli
     call YKExitISR
 
@@ -45,7 +45,7 @@ keyboard:
     call YKEnterISR
 
 	sti
-	call lab6keybrd
+	call keyboardHandler
 	cli
 
     call YKExitISR

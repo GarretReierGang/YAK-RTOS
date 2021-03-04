@@ -34,7 +34,7 @@ unsigned int YKSemAvailCount = MAX_SEMAPHORES;
 #ifdef MESSAGING
 unsigned int YKQAvailCount = MAX_MESSAGE_QUEUES;
 #endif
-#ifdef YKEvent
+#ifdef EVENTS
 unsigned int YKEventAvailCount = MAX_EVENTS;
 #endif
 
@@ -449,12 +449,12 @@ int YKQPost(YKQ *messageQueue, void *msg) {
 //========================================================
 //                      Events
 // -------------------------------------------------------
-#ifdef YKEvent
+#ifdef EVENTS
 
-YKEvent YKEvents[MAX_EVENTS];
+YKEVENT YKEvents[MAX_EVENTS];
 
-YKEvent* YKEventCreate(unsigned init) {
-    YKEvent* newEvent;
+YKEVENT* YKEventCreate(unsigned init) {
+    YKEVENT* newEvent;
     YKEnterMutex();
     if (YKEventAvailCount <= 0)
     {
@@ -470,16 +470,16 @@ YKEvent* YKEventCreate(unsigned init) {
     return newEvent;
 }
 
-inline bool eventCheck(unsigned currentFlags, unsigned conditions, unsigned type)
+int eventCheck(unsigned currentFlags, unsigned conditions, unsigned type)
 {
     if (type == EVENT_WAIT_ANY)
     {
-        return (bool) currentFlags & conditions;
+        return currentFlags & conditions;
     }
     return (currentFlags & conditions) == conditions;
 }
 
-unsigned YKEventPend(YKEvenet *event, unsigned eventMask, int waitMode) {
+unsigned YKEventPend(YKEVENT *event, unsigned eventMask, int waitMode) {
     TCBptr temp;
 
     YKEnterMutex();
@@ -499,7 +499,7 @@ unsigned YKEventPend(YKEvenet *event, unsigned eventMask, int waitMode) {
 }
 
 // Can only set flags. Cannot lower them.
-void YKEventSet(YKEvent *event, unsigned eventMask) {
+void YKEventSet(YKEVENT *event, unsigned eventMask) {
     TCBptr temp, next;
     YKEnterMutex();
     // Check if new events cause flags to change.
@@ -534,7 +534,7 @@ void YKEventSet(YKEvent *event, unsigned eventMask) {
 // It cannot cause new events to occur.
 // Inverting the event masks to reset,
 // Has no effect on current flags that are not in the event mask.
-void YKEventReset(YKEvent *event, unsigned eventMask) {
+void YKEventReset(YKEVENT *event, unsigned eventMask) {
     YKEnterMutex();
     eventMask = ~eventMask;
     event->flags &= eventMask;

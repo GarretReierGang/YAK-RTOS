@@ -12,12 +12,7 @@ extern YKQ *MsgQPtr;
 extern struct msg MsgArray[];
 extern int GlobalFlag;
 
-void lab6reset(void)
-{
-    exit(0);
-}
-
-void lab6tick(void)
+void tickHandler(void)
 {
     static int next = 0;
     static int data = 0;
@@ -33,7 +28,7 @@ void lab6tick(void)
         next = 0;
 }
 
-void lab6keybrd(void)
+void keyboardHandler(void)
 {
     GlobalFlag = 1;
 }

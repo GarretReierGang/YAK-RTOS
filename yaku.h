@@ -1,3 +1,9 @@
+#ifndef YAKU_H
+#define  YAKU_H
+
+#define SEMAPHORE
+#define MESSAGING
+#define EVENTS
 #define MAX_TASKS 5
 #define MAX_TASK_SIZE 32
 #define MAX_SEMAPHORES 12
@@ -13,3 +19,4 @@
 #define EVENT_WAIT_ANY 1
 
 #define NULL 0
+#endif

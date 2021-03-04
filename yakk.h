@@ -1,11 +1,9 @@
 #ifndef YAKK_H
 #define YAKK_H
-
+#include "yaku.h"
 #define DEBUG_MODE
 //#define DEBUG_YKQ
 //#define VERBOSE
-#define SEMAPHORE
-#define MESSAGING
 
 extern unsigned int YKCtxSwCount;
 extern unsigned int YKIdleCount;
@@ -49,8 +47,8 @@ typedef struct ykq
 #ifdef EVENTS
 typedef struct eventGroup {
   unsigned flags;
-  TCBptr waitingOn;
-} YKEvent;
+  TCBptr blockedOn;
+} YKEVENT;
 #endif
 
 
@@ -107,11 +105,11 @@ int YKQPost(YKQ *queue, void *msg);
 //  Events, slower and more complicated to process than a semaphore
 //
 //-----------------------------------------------------------------------
-#ifdef YKEvent
-YKEvent* YKEventCreate(unsigned init);
-unsigned YKEventPend(YKEvenet *event, unsigned eventMask, int waitMode);
-void YKEventSet(YKEvent *event, unsigned eventMask);
-void YKEventReset(YKEvent *event, unsigned eventMask);
+#ifdef EVENTS
+YKEVENT* YKEventCreate(unsigned init);
+unsigned YKEventPend(YKEVENT *event, unsigned eventMask, int waitMode);
+void YKEventSet(YKEVENT *event, unsigned eventMask);
+void YKEventReset(YKEVENT *event, unsigned eventMask);
 #endif
 //------------------------------------------------------------------------
 //========================================================================
